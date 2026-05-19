@@ -132,6 +132,65 @@ void multipleSpansAreEncodedIntoOneRequest() {
     assert(calls == 1);
 }
 
+void semanticSpanFieldsAreEncoded() {
+    bool captured = false;
+    auto transport = [&](galay::tracing::OtlpHttpRequest request) {
+        captured = true;
+        assert(request.body.find("\"kind\":\"SPAN_KIND_CLIENT\"") != std::string::npos);
+        assert(request.body.find("\"status\":{\"code\":\"STATUS_CODE_ERROR\",\"message\":\"timeout\"}") != std::string::npos);
+        assert(request.body.find("\"attributes\"") != std::string::npos);
+        assert(request.body.find("\"key\":\"http.method\",\"value\":{\"stringValue\":\"GET\"}") != std::string::npos);
+        assert(request.body.find("\"key\":\"http.status_code\",\"value\":{\"intValue\":\"503\"}") != std::string::npos);
+        assert(request.body.find("\"key\":\"retry\",\"value\":{\"boolValue\":true}") != std::string::npos);
+        assert(request.body.find("\"key\":\"latency_ms\",\"value\":{\"doubleValue\":12.5}") != std::string::npos);
+        return galay::tracing::OtlpHttpResponse{.status_code = 200};
+    };
+
+    galay::tracing::Span span("client", makeContext());
+    span.setKind(galay::tracing::SpanKind::kClient);
+    span.setStatus(galay::tracing::SpanStatusCode::kError, "timeout");
+    assert(span.setAttribute("http.method", "GET"));
+    assert(span.setAttribute("http.status_code", 503));
+    assert(span.setAttribute("retry", true));
+    assert(span.setAttribute("latency_ms", 12.5));
+    span.end();
+
+    galay::tracing::OtlpHttpExporter exporter({}, transport);
+    const std::vector spans{span};
+
+    assert(exporter.exportSpans(std::span<const galay::tracing::Span>(spans)) == galay::tracing::ExportResult::kSuccess);
+    assert(captured);
+}
+
+void resourceAndScopeMetadataAreEncoded() {
+    auto config = galay::tracing::OtlpHttpExporterConfig{
+        .resource_attributes = {
+            galay::tracing::spanAttribute("service.name", "order-service"),
+            galay::tracing::spanAttribute("deployment.environment", "test"),
+        },
+        .scope = {
+            .name = "order-handler",
+            .version = "1.2.3",
+        },
+    };
+
+    bool captured = false;
+    auto transport = [&](galay::tracing::OtlpHttpRequest request) {
+        captured = true;
+        assert(request.body.find("\"resource\":{\"attributes\"") != std::string::npos);
+        assert(request.body.find("\"key\":\"service.name\",\"value\":{\"stringValue\":\"order-service\"}") != std::string::npos);
+        assert(request.body.find("\"key\":\"deployment.environment\",\"value\":{\"stringValue\":\"test\"}") != std::string::npos);
+        assert(request.body.find("\"scope\":{\"name\":\"order-handler\",\"version\":\"1.2.3\"}") != std::string::npos);
+        return galay::tracing::OtlpHttpResponse{.status_code = 200};
+    };
+
+    galay::tracing::OtlpHttpExporter exporter(config, transport);
+    const std::vector spans{makeSpan("resource")};
+
+    assert(exporter.exportSpans(std::span<const galay::tracing::Span>(spans)) == galay::tracing::ExportResult::kSuccess);
+    assert(captured);
+}
+
 #if defined(GALAY_TRACING_ENABLE_OTLP_HTTP)
 galay::kernel::Task<galay::tracing::ExportResult> exportOnSchedulerThread() {
     auto transport = galay::tracing::makeGalayHttpOtlpTransport();
@@ -174,6 +233,8 @@ int main() {
     emptyBatchDoesNotSendRequest();
     nonSuccessStatusFailsExport();
     multipleSpansAreEncodedIntoOneRequest();
+    semanticSpanFieldsAreEncoded();
+    resourceAndScopeMetadataAreEncoded();
 #if defined(GALAY_TRACING_ENABLE_OTLP_HTTP)
     galayHttpTransportRejectsSchedulerThreadBlocking();
     galayHttpTransportRejectsMalformedEndpoint();

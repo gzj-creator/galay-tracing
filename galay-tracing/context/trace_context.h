@@ -78,6 +78,80 @@ private:
     std::string m_tracestate;
 };
 
+// Lightweight span identity used on hot paths. Tracestate stays outside this
+// type and is copied into TraceContext only when propagation/export APIs need it.
+class SpanContext {
+public:
+    SpanContext() = default;
+
+    explicit constexpr SpanContext(
+        TraceId traceId,
+        SpanId spanId,
+        std::uint8_t traceFlags = 0,
+        std::optional<SpanId> parentSpanId = std::nullopt) noexcept
+        : m_traceId(traceId),
+          m_spanId(spanId),
+          m_parentSpanId(parentSpanId),
+          m_traceFlags(traceFlags) {
+    }
+
+    explicit SpanContext(const TraceContext& context) noexcept
+        : SpanContext(context.traceId(), context.spanId(), context.traceFlags(), context.parentSpanId()) {
+    }
+
+    [[nodiscard]] bool isValid() const noexcept {
+        return m_traceId.isValid() && m_spanId.isValid();
+    }
+
+    [[nodiscard]] const TraceId& traceId() const noexcept {
+        return m_traceId;
+    }
+
+    [[nodiscard]] const SpanId& spanId() const noexcept {
+        return m_spanId;
+    }
+
+    [[nodiscard]] const std::optional<SpanId>& parentSpanId() const noexcept {
+        return m_parentSpanId;
+    }
+
+    [[nodiscard]] std::uint8_t traceFlags() const noexcept {
+        return m_traceFlags;
+    }
+
+    [[nodiscard]] bool sampled() const noexcept {
+        return (m_traceFlags & kSampledFlag) != 0;
+    }
+
+    void setSpanId(SpanId spanId) noexcept {
+        m_spanId = spanId;
+    }
+
+    void setParentSpanId(std::optional<SpanId> parentSpanId) noexcept {
+        m_parentSpanId = parentSpanId;
+    }
+
+    void setTraceFlags(std::uint8_t traceFlags) noexcept {
+        m_traceFlags = traceFlags;
+    }
+
+    [[nodiscard]] TraceContext toTraceContext(std::string tracestate = {}) const {
+        TraceContext context(m_traceId, m_spanId, m_traceFlags, std::move(tracestate));
+        context.setParentSpanId(m_parentSpanId);
+        return context;
+    }
+
+    friend bool operator==(const SpanContext&, const SpanContext&) noexcept = default;
+
+private:
+    static constexpr std::uint8_t kSampledFlag = 0x01;
+
+    TraceId m_traceId{};
+    SpanId m_spanId{};
+    std::optional<SpanId> m_parentSpanId;
+    std::uint8_t m_traceFlags{0};
+};
+
 // Lightweight trace identity copied into log records. It intentionally omits
 // tracestate and parent span id; propagation and exporters keep using TraceContext.
 class LogContext {

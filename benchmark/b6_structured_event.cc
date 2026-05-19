@@ -175,6 +175,42 @@ double measureMacroEnabledNs(std::size_t& writes, std::size_t& fields) {
     return static_cast<double>(ns) / kIterations;
 }
 
+double measureDefaultMacroDisabledNs() {
+    constexpr int kIterations = 200000;
+    StructuredNoopWriter writer(disabledThreshold());
+    galay::tracing::setDefaultLogWriter(&writer);
+
+    const auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < kIterations; ++i) {
+        const int value = blackBoxInt(i);
+        GALAY_EVENT_DEBUG_DEFAULT(std::nullopt, "value", galay::tracing::field("value", value));
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    galay::tracing::setDefaultLogWriter(nullptr);
+    const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
+
+    return static_cast<double>(ns) / kIterations;
+}
+
+double measureDefaultMacroEnabledNs(std::size_t& writes, std::size_t& fields) {
+    constexpr int kIterations = 100000;
+    StructuredNoopWriter writer(enabledThreshold());
+    galay::tracing::setDefaultLogWriter(&writer);
+
+    const auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < kIterations; ++i) {
+        doNotOptimize(i);
+        GALAY_EVENT_INFO_DEFAULT(std::nullopt, "value", galay::tracing::field("value", i));
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    galay::tracing::setDefaultLogWriter(nullptr);
+    const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
+
+    writes = writer.count;
+    fields = writer.fieldCount;
+    return static_cast<double>(ns) / kIterations;
+}
+
 double measureLoggerFallbackNs(std::size_t& writes) {
     constexpr int kIterations = 100000;
     auto sink = std::make_shared<NullSink>();
@@ -210,6 +246,10 @@ int main() {
     std::size_t macroFields = 0;
     const double macroDisabled = measureMacroDisabledNs();
     const double macroEnabled = measureMacroEnabledNs(macroWrites, macroFields);
+    std::size_t defaultMacroWrites = 0;
+    std::size_t defaultMacroFields = 0;
+    const double defaultMacroDisabled = measureDefaultMacroDisabledNs();
+    const double defaultMacroEnabled = measureDefaultMacroEnabledNs(defaultMacroWrites, defaultMacroFields);
     std::size_t fallbackWrites = 0;
     const double loggerFallback = measureLoggerFallbackNs(fallbackWrites);
 
@@ -227,6 +267,10 @@ int main() {
               << " macro_enabled_ns_per_event=" << macroEnabled
               << " macro_writes=" << macroWrites
               << " macro_fields=" << macroFields
+              << " default_macro_disabled_ns_per_event=" << defaultMacroDisabled
+              << " default_macro_enabled_ns_per_event=" << defaultMacroEnabled
+              << " default_macro_writes=" << defaultMacroWrites
+              << " default_macro_fields=" << defaultMacroFields
               << " logger_fallback_ns_per_event=" << loggerFallback
               << " fallback_writes=" << fallbackWrites << '\n';
 }

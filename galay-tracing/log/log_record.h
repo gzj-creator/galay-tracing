@@ -23,17 +23,94 @@ enum class LogFieldType {
 
 // Non-owning structured field value used by event(...). String values must
 // outlive the write call that receives the containing StructuredLogRecord.
-struct LogFieldValue {
-    LogFieldType type{LogFieldType::kString};
-    std::int64_t int64_value{0};
-    std::uint64_t uint64_value{0};
-    double double_value{0.0};
-    bool bool_value{false};
-    std::string_view string_value;
+class LogFieldValue {
+public:
+    constexpr LogFieldValue() noexcept = default;
+
+    [[nodiscard]] static constexpr LogFieldValue fromInt64(std::int64_t value) noexcept {
+        return LogFieldValue(LogFieldType::kInt64, Storage(value));
+    }
+
+    [[nodiscard]] static constexpr LogFieldValue fromUInt64(std::uint64_t value) noexcept {
+        return LogFieldValue(LogFieldType::kUInt64, Storage(value));
+    }
+
+    [[nodiscard]] static constexpr LogFieldValue fromDouble(double value) noexcept {
+        return LogFieldValue(LogFieldType::kDouble, Storage(value));
+    }
+
+    [[nodiscard]] static constexpr LogFieldValue fromBool(bool value) noexcept {
+        return LogFieldValue(LogFieldType::kBool, Storage(value));
+    }
+
+    [[nodiscard]] static constexpr LogFieldValue fromString(std::string_view value) noexcept {
+        return LogFieldValue(LogFieldType::kString, Storage(value));
+    }
+
+    [[nodiscard]] constexpr LogFieldType type() const noexcept {
+        return m_type;
+    }
 
     [[nodiscard]] constexpr std::int64_t asInt64() const noexcept {
-        return int64_value;
+        return m_storage.int64Value;
     }
+
+    [[nodiscard]] constexpr std::uint64_t asUInt64() const noexcept {
+        return m_storage.uint64Value;
+    }
+
+    [[nodiscard]] constexpr double asDouble() const noexcept {
+        return m_storage.doubleValue;
+    }
+
+    [[nodiscard]] constexpr bool asBool() const noexcept {
+        return m_storage.boolValue;
+    }
+
+    [[nodiscard]] constexpr std::string_view asString() const noexcept {
+        return m_storage.stringValue;
+    }
+
+private:
+    union Storage {
+        constexpr Storage() noexcept
+            : stringValue() {
+        }
+
+        explicit constexpr Storage(std::int64_t value) noexcept
+            : int64Value(value) {
+        }
+
+        explicit constexpr Storage(std::uint64_t value) noexcept
+            : uint64Value(value) {
+        }
+
+        explicit constexpr Storage(double value) noexcept
+            : doubleValue(value) {
+        }
+
+        explicit constexpr Storage(bool value) noexcept
+            : boolValue(value) {
+        }
+
+        explicit constexpr Storage(std::string_view value) noexcept
+            : stringValue(value) {
+        }
+
+        std::int64_t int64Value;
+        std::uint64_t uint64Value;
+        double doubleValue;
+        bool boolValue;
+        std::string_view stringValue;
+    };
+
+    explicit constexpr LogFieldValue(LogFieldType type, Storage storage) noexcept
+        : m_type(type),
+          m_storage(storage) {
+    }
+
+    LogFieldType m_type{LogFieldType::kString};
+    Storage m_storage{};
 };
 
 struct LogField {
@@ -42,7 +119,7 @@ struct LogField {
 };
 
 [[nodiscard]] constexpr LogField field(std::string_view name, std::int64_t value) noexcept {
-    return LogField{.name = name, .value = {.type = LogFieldType::kInt64, .int64_value = value}};
+    return LogField{.name = name, .value = LogFieldValue::fromInt64(value)};
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, int value) noexcept {
@@ -50,19 +127,19 @@ struct LogField {
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, std::uint64_t value) noexcept {
-    return LogField{.name = name, .value = {.type = LogFieldType::kUInt64, .uint64_value = value}};
+    return LogField{.name = name, .value = LogFieldValue::fromUInt64(value)};
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, double value) noexcept {
-    return LogField{.name = name, .value = {.type = LogFieldType::kDouble, .double_value = value}};
+    return LogField{.name = name, .value = LogFieldValue::fromDouble(value)};
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, bool value) noexcept {
-    return LogField{.name = name, .value = {.type = LogFieldType::kBool, .bool_value = value}};
+    return LogField{.name = name, .value = LogFieldValue::fromBool(value)};
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, std::string_view value) noexcept {
-    return LogField{.name = name, .value = {.type = LogFieldType::kString, .string_value = value}};
+    return LogField{.name = name, .value = LogFieldValue::fromString(value)};
 }
 
 [[nodiscard]] constexpr LogField field(std::string_view name, const char* value) noexcept {

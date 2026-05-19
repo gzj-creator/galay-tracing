@@ -24,7 +24,6 @@ struct DefaultLogWriterSnapshot {
 
 std::mutex g_defaultWriterConfigMutex;
 std::vector<std::unique_ptr<DefaultLogWriterSnapshot>> g_defaultWriterSnapshots;
-std::atomic<const DefaultLogWriterSnapshot*> g_defaultWriterSnapshot{nullptr};
 
 [[nodiscard]] detail::ErasedLogWriter loggerWriterRef(Logger& logger) noexcept {
     return detail::ErasedLogWriter{
@@ -51,31 +50,36 @@ std::atomic<const DefaultLogWriterSnapshot*> g_defaultWriterSnapshot{nullptr};
     return logger;
 }
 
+[[nodiscard]] const DefaultLogWriterSnapshot& builtInDefaultWriterSnapshot() {
+    static const DefaultLogWriterSnapshot snapshot{loggerWriterRef(builtInDefaultLogger())};
+    return snapshot;
+}
+
 void appendFieldValue(std::string& message, const LogFieldValue& value) {
     std::array<char, 32> buffer{};
-    switch (value.type) {
+    switch (value.type()) {
     case LogFieldType::kInt64: {
-        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.int64_value);
+        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.asInt64());
         if (error == std::errc{}) {
             message.append(buffer.data(), static_cast<std::size_t>(end - buffer.data()));
         }
         break;
     }
     case LogFieldType::kUInt64: {
-        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.uint64_value);
+        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.asUInt64());
         if (error == std::errc{}) {
             message.append(buffer.data(), static_cast<std::size_t>(end - buffer.data()));
         }
         break;
     }
     case LogFieldType::kDouble:
-        message.append(std::to_string(value.double_value));
+        message.append(std::to_string(value.asDouble()));
         break;
     case LogFieldType::kBool:
-        message.append(value.bool_value ? "true" : "false");
+        message.append(value.asBool() ? "true" : "false");
         break;
     case LogFieldType::kString:
-        message.append(value.string_value);
+        message.append(value.asString());
         break;
     }
 }
@@ -84,8 +88,8 @@ void appendFieldValue(std::string& message, const LogFieldValue& value) {
     std::size_t estimatedSize = record.name.size();
     for (const auto& field : record.fields) {
         estimatedSize += field.name.size() + 2;
-        if (field.value.type == LogFieldType::kString) {
-            estimatedSize += field.value.string_value.size();
+        if (field.value.type() == LogFieldType::kString) {
+            estimatedSize += field.value.asString().size();
         } else {
             estimatedSize += 24;
         }
@@ -112,22 +116,21 @@ void appendFieldValue(std::string& message, const LogFieldValue& value) {
 
 namespace detail {
 
-void ErasedLogWriter::write(StructuredLogRecord record) {
-    if (object == nullptr) {
-        return;
-    }
-    if (writeStructuredFn != nullptr) {
-        writeStructuredFn(object, record);
-        return;
-    }
+std::atomic<const ErasedLogWriter*> g_defaultLogWriterPtr{nullptr};
+
+void ErasedLogWriter::writeStructuredFallback(StructuredLogRecord record) const {
     if (writeFn != nullptr) {
         writeFn(object, makeLogRecord(record));
     }
 }
 
+const ErasedLogWriter* builtInDefaultLogWriterPtr() noexcept {
+    return &builtInDefaultWriterSnapshot().writer;
+}
+
 void setDefaultLogWriterRef(ErasedLogWriter writer) noexcept {
     if (writer.object == nullptr) {
-        g_defaultWriterSnapshot.store(nullptr, std::memory_order_release);
+        g_defaultLogWriterPtr.store(nullptr, std::memory_order_release);
         return;
     }
 
@@ -139,16 +142,15 @@ void setDefaultLogWriterRef(ErasedLogWriter writer) noexcept {
         // the previous pointer. Default writer configuration is rare.
         g_defaultWriterSnapshots.push_back(std::move(next));
     }
-    g_defaultWriterSnapshot.store(snapshot, std::memory_order_release);
+    g_defaultLogWriterPtr.store(&snapshot->writer, std::memory_order_release);
 }
 
 ErasedLogWriter defaultLogWriterRef() noexcept {
-    if (auto* snapshot = g_defaultWriterSnapshot.load(std::memory_order_acquire);
-        snapshot && snapshot->writer.object != nullptr) {
-        return snapshot->writer;
-    }
+    return *defaultLogWriterPtr();
+}
 
-    return loggerWriterRef(defaultLogger());
+DefaultLogWriter defaultLogWriter() noexcept {
+    return DefaultLogWriter(defaultLogWriterPtr());
 }
 
 } // namespace detail

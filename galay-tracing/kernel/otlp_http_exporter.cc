@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cctype>
 #include <exception>
 #include <memory>
@@ -78,28 +79,166 @@ void appendHexId(std::string& out, const Id& id) {
     out.append(hex.data(), hex.size());
 }
 
-[[nodiscard]] std::size_t estimateOtlpJsonBodySize(std::span<const Span> spans) noexcept {
-    std::size_t size = 96;
+[[nodiscard]] std::string_view otlpSpanKindName(SpanKind kind) noexcept {
+    switch (kind) {
+    case SpanKind::kServer:
+        return "SPAN_KIND_SERVER";
+    case SpanKind::kClient:
+        return "SPAN_KIND_CLIENT";
+    case SpanKind::kProducer:
+        return "SPAN_KIND_PRODUCER";
+    case SpanKind::kConsumer:
+        return "SPAN_KIND_CONSUMER";
+    case SpanKind::kInternal:
+    default:
+        return "SPAN_KIND_INTERNAL";
+    }
+}
+
+[[nodiscard]] std::string_view otlpStatusCodeName(SpanStatusCode code) noexcept {
+    switch (code) {
+    case SpanStatusCode::kOk:
+        return "STATUS_CODE_OK";
+    case SpanStatusCode::kError:
+        return "STATUS_CODE_ERROR";
+    case SpanStatusCode::kUnset:
+    default:
+        return "STATUS_CODE_UNSET";
+    }
+}
+
+template <typename Number>
+void appendNumber(std::string& out, Number value) {
+    std::array<char, 32> buffer{};
+    auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    if (error == std::errc{}) {
+        out.append(buffer.data(), static_cast<std::size_t>(end - buffer.data()));
+    }
+}
+
+void appendAttributeValue(std::string& out, const SpanAttributeValue& value) {
+    switch (value.type()) {
+    case SpanAttributeType::kInt64:
+        out.append("{\"intValue\":\"");
+        appendNumber(out, value.asInt64());
+        out.append("\"}");
+        break;
+    case SpanAttributeType::kUInt64:
+        out.append("{\"intValue\":\"");
+        appendNumber(out, value.asUInt64());
+        out.append("\"}");
+        break;
+    case SpanAttributeType::kDouble:
+        out.append("{\"doubleValue\":");
+        appendNumber(out, value.asDouble());
+        out.push_back('}');
+        break;
+    case SpanAttributeType::kBool:
+        out.append(value.asBool() ? "{\"boolValue\":true}" : "{\"boolValue\":false}");
+        break;
+    case SpanAttributeType::kString:
+        out.append("{\"stringValue\":");
+        appendJsonString(out, value.asString());
+        out.push_back('}');
+        break;
+    }
+}
+
+void appendAttributeArray(std::string& out, std::span<const SpanAttribute> attributes) {
+    out.push_back('[');
+    for (std::size_t i = 0; i < attributes.size(); ++i) {
+        if (i != 0) {
+            out.push_back(',');
+        }
+        out.append("{\"key\":");
+        appendJsonString(out, attributes[i].name);
+        out.append(",\"value\":");
+        appendAttributeValue(out, attributes[i].value);
+        out.push_back('}');
+    }
+    out.push_back(']');
+}
+
+void appendAttributes(std::string& out, std::span<const SpanAttribute> attributes) {
+    out.append(",\"attributes\":");
+    appendAttributeArray(out, attributes);
+}
+
+void appendResource(std::string& out, std::span<const SpanAttribute> attributes) {
+    if (attributes.empty()) {
+        return;
+    }
+    out.append("\"resource\":{\"attributes\":");
+    appendAttributeArray(out, attributes);
+    out.append("},");
+}
+
+void appendScope(std::string& out, const InstrumentationScopeConfig& scope) {
+    out.append("\"scope\":{\"name\":");
+    appendJsonString(out, scope.name);
+    if (!scope.version.empty()) {
+        out.append(",\"version\":");
+        appendJsonString(out, scope.version);
+    }
+    out.push_back('}');
+}
+
+void appendStatus(std::string& out, const SpanStatus& status) {
+    if (status.code == SpanStatusCode::kUnset && status.message.empty()) {
+        return;
+    }
+    out.append(",\"status\":{\"code\":\"");
+    out.append(otlpStatusCodeName(status.code));
+    out.push_back('"');
+    if (!status.message.empty()) {
+        out.append(",\"message\":");
+        appendJsonString(out, status.message);
+    }
+    out.push_back('}');
+}
+
+void addAttributeEstimate(std::size_t& size, std::span<const SpanAttribute> attributes) noexcept {
+    for (const auto& attribute : attributes) {
+        size += attribute.name.size() + 48;
+        if (attribute.value.type() == SpanAttributeType::kString) {
+            size += attribute.value.asString().size();
+        }
+    }
+}
+
+[[nodiscard]] std::size_t estimateOtlpJsonBodySize(
+    std::span<const Span> spans,
+    const OtlpHttpExporterConfig& config) noexcept {
+    std::size_t size = 128 + config.scope.name.size() + config.scope.version.size();
+    addAttributeEstimate(size, config.resource_attributes);
     for (const auto& span : spans) {
         size += 160 + span.name().size();
-        const auto& context = span.context();
+        const auto& context = span.spanContext();
         if (context.parentSpanId().has_value()) {
             size += SpanId::kHexLength + 18;
         }
-        if (!context.tracestate().empty()) {
-            size += context.tracestate().size() + 16;
+        if (!span.tracestate().empty()) {
+            size += span.tracestate().size() + 16;
         }
+        if (span.status().code != SpanStatusCode::kUnset || !span.status().message.empty()) {
+            size += span.status().message.size() + 64;
+        }
+        addAttributeEstimate(size, span.attributes());
     }
     return size;
 }
 
-[[nodiscard]] std::string buildOtlpJsonBody(std::span<const Span> spans) {
+[[nodiscard]] std::string buildOtlpJsonBody(std::span<const Span> spans, const OtlpHttpExporterConfig& config) {
     std::string body;
-    body.reserve(estimateOtlpJsonBodySize(spans));
-    body.append("{\"resourceSpans\":[{\"scopeSpans\":[{\"scope\":{\"name\":\"galay-tracing\"},\"spans\":[");
+    body.reserve(estimateOtlpJsonBodySize(spans, config));
+    body.append("{\"resourceSpans\":[{");
+    appendResource(body, config.resource_attributes);
+    body.append("\"scopeSpans\":[{");
+    appendScope(body, config.scope);
+    body.append(",\"spans\":[");
     for (std::size_t i = 0; i < spans.size(); ++i) {
         const auto& span = spans[i];
-        const auto& context = span.context();
+        const auto& context = span.spanContext();
         if (i != 0) {
             body.push_back(',');
         }
@@ -109,16 +248,22 @@ void appendHexId(std::string& out, const Id& id) {
         appendHexId(body, context.spanId());
         body.append("\",\"name\":");
         appendJsonString(body, span.name());
-        body.append(",\"kind\":\"SPAN_KIND_INTERNAL\"");
+        body.append(",\"kind\":\"");
+        body.append(otlpSpanKindName(span.kind()));
+        body.push_back('"');
         if (context.parentSpanId().has_value()) {
             body.append(",\"parentSpanId\":\"");
             appendHexId(body, *context.parentSpanId());
             body.push_back('"');
         }
-        if (!context.tracestate().empty()) {
+        if (!span.tracestate().empty()) {
             body.append(",\"traceState\":");
-            appendJsonString(body, context.tracestate());
+            appendJsonString(body, span.tracestate());
         }
+        if (!span.attributes().empty()) {
+            appendAttributes(body, span.attributes());
+        }
+        appendStatus(body, span.status());
         body.push_back('}');
     }
     body.append("]}]}]}");
@@ -307,7 +452,7 @@ ExportResult OtlpHttpExporter::exportSpans(std::span<const Span> spans) {
             .endpoint = m_config.endpoint,
             .timeout = m_config.timeout,
             .headers = m_headers,
-            .body = buildOtlpJsonBody(spans),
+            .body = buildOtlpJsonBody(spans, m_config),
         });
     } catch (...) {
         return ExportResult::kFailure;

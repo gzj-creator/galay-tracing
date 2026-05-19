@@ -37,6 +37,9 @@ static_assert(std::is_same_v<
 static_assert(sizeof(galay::tracing::LogContext) <= 32);
 static_assert(sizeof(std::optional<galay::tracing::LogContext>) <= 40);
 static_assert(sizeof(galay::tracing::LogContext) < sizeof(galay::tracing::TraceContext));
+static_assert(sizeof(galay::tracing::LogFieldValue) <= 32);
+static_assert(sizeof(galay::tracing::LogField) <= 48);
+static_assert(sizeof(galay::tracing::detail::DefaultLogWriter) <= sizeof(void*));
 
 class TestSink final : public galay::tracing::LogSink {
 public:
@@ -315,6 +318,40 @@ void eventMacroWritesEnabledStructuredEvent() {
     assert(writer.context->traceId() == context.traceId());
 }
 
+void defaultEventMacroDoesNotEvaluateDisabledFields() {
+    StructuredWriter writer;
+    writer.minLevel = galay::tracing::LogLevel::kError;
+    galay::tracing::setDefaultLogWriter(&writer);
+    int evaluations = 0;
+
+    GALAY_EVENT_DEBUG_DEFAULT(makeTestContext(), "order_sent", countedField(evaluations));
+
+    galay::tracing::setDefaultLogWriter(nullptr);
+
+    assert(evaluations == 0);
+    assert(writer.name.empty());
+}
+
+void defaultEventMacroWritesEnabledStructuredEvent() {
+    const auto context = makeTestContext();
+    StructuredWriter writer;
+    galay::tracing::setDefaultLogWriter(&writer);
+    int evaluations = 0;
+
+    GALAY_EVENT_INFO_DEFAULT(context, "order_sent", countedField(evaluations));
+
+    galay::tracing::setDefaultLogWriter(nullptr);
+
+    assert(evaluations == 1);
+    assert(writer.level == galay::tracing::LogLevel::kInfo);
+    assert(writer.name == "order_sent");
+    assert(writer.fieldCount == 1);
+    assert(writer.firstFieldName == "order_id");
+    assert(writer.firstFieldValue == 42);
+    assert(writer.context.has_value());
+    assert(writer.context->traceId() == context.traceId());
+}
+
 } // namespace
 
 int main() {
@@ -331,4 +368,6 @@ int main() {
     structuredEventCanUseLoggerSink();
     eventMacroDoesNotEvaluateDisabledFields();
     eventMacroWritesEnabledStructuredEvent();
+    defaultEventMacroDoesNotEvaluateDisabledFields();
+    defaultEventMacroWritesEnabledStructuredEvent();
 }

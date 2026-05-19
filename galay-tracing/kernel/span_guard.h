@@ -3,6 +3,7 @@
 #include "galay-tracing/kernel/span.h"
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace galay::tracing {
@@ -10,7 +11,7 @@ namespace galay::tracing {
 class SpanGuard {
 public:
     SpanGuard() noexcept = default;
-    SpanGuard(Span span, std::optional<TraceContext> previousContext);
+    SpanGuard(Span span, std::optional<SpanContext> previousContext, std::string previousTracestate);
     ~SpanGuard() noexcept;
 
     SpanGuard(const SpanGuard&) = delete;
@@ -33,7 +34,8 @@ private:
     void restore() noexcept;
 
     Span m_span;
-    std::optional<TraceContext> m_previousContext;
+    std::optional<SpanContext> m_previousContext;
+    std::string m_previousTracestate;
     bool m_active{false};
 };
 

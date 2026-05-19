@@ -26,8 +26,12 @@ Maintenance rules:
 - Added a guarded C++23 module facade source layout for supported toolchains.
 - Added release benchmark programs for disabled logs, enabled logs, span scopes, and traceparent parse/inject.
 - Added structured event logging with concept-based writers, `event(ctx).info(...)`, and Rust-like `GALAY_EVENT_*` callsite macros that skip field evaluation when disabled.
+- Added `GALAY_EVENT_*_DEFAULT` macros for default-writer structured events with disabled-field short-circuiting.
+- Added lightweight `SpanContext` for span hot paths that do not need tracestate storage.
+- Added `SpanTimingPolicy` configuration so span start/end timestamps can stay disabled by default and be enabled when exporters need them.
 - Added an OTLP/HTTP JSON span exporter with configurable endpoint, headers, custom transports, and an optional `galay-http` backed transport.
 - Added OTLP JSON and structured event benchmarks, plus a Rust `tracing` comparison benchmark.
+- Added exporter-level resource attributes and instrumentation scope metadata for OTLP/HTTP JSON export.
 
 ### Changed
 
@@ -35,3 +39,11 @@ Maintenance rules:
 - Reduced tracing hot-path overhead by using snapshot-based logger sinks, lock-free default writer lookup, thread-local ID generation, and a slimmer `SpanGuard`.
 - Split lightweight `LogContext` from full `TraceContext` so log records keep trace/span identity without copying tracestate or parent span metadata.
 - Reduced logger fallback overhead by avoiding sink snapshot reference-count churn and by tightening structured-event fallback formatting.
+- Reduced structured event field footprint by compacting `LogFieldValue` storage and added benchmark output for default-writer macros and subscriber-like noop span scopes.
+- Reduced default-writer event overhead by routing default `log(ctx)` and `event(ctx)` through a compact pointer-sized writer proxy.
+- Reduced default span scope overhead by keeping span start/end timestamp recording disabled unless `SpanTimingPolicy::kEnabled` is configured.
+- Reduced default structured-event overhead by inlining the configured default writer lookup and structured writer fast path.
+- Reduced real span scope overhead by storing `SpanContext` inside `Span` and generating IDs from a faster thread-local non-cryptographic stream.
+- `Span::context()` now returns a full `TraceContext` by value; exporters can use `spanContext()` and `tracestate()` to avoid rebuilding propagation context on hot paths.
+- Added span kind, status, and bounded owning attributes, and encoded them in OTLP/HTTP JSON export.
+- Integrated process-wide sampler configuration with parent-based and trace-id-ratio sampling decisions at span start.

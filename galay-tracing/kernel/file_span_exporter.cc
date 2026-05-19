@@ -18,15 +18,16 @@ void appendJsonString(std::string& out, std::string_view value) {
 }
 
 [[nodiscard]] std::string renderSpanJson(const Span& span) {
+    const auto& context = span.spanContext();
     std::string line;
     line.append("{\"name\":");
     appendJsonString(line, span.name());
     line.append(",\"trace_id\":\"");
-    line.append(span.context().traceId().toHex());
+    line.append(context.traceId().toHex());
     line.append("\",\"span_id\":\"");
-    line.append(span.context().spanId().toHex());
+    line.append(context.spanId().toHex());
     line.append("\",\"sampled\":");
-    line.append(span.context().sampled() ? "true" : "false");
+    line.append(context.sampled() ? "true" : "false");
     line.push_back('}');
     return line;
 }

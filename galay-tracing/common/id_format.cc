@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <random>
 
 namespace galay::tracing::detail {
@@ -32,25 +33,36 @@ std::uint64_t randomSeed() noexcept {
     }
 }
 
-std::mt19937_64& threadLocalGenerator() noexcept {
-    thread_local std::mt19937_64 generator(randomSeed());
-    return generator;
+std::uint64_t nextRandom64() noexcept {
+    thread_local std::uint64_t state = randomSeed();
+    state += 0x9e3779b97f4a7c15ULL;
+    auto value = state;
+    value = (value ^ (value >> 30U)) * 0xbf58476d1ce4e5b9ULL;
+    value = (value ^ (value >> 27U)) * 0x94d049bb133111ebULL;
+    return value ^ (value >> 31U);
 }
 
 template <std::size_t N>
 void fillRandomBytes(std::array<std::byte, N>& bytes) noexcept {
-    auto& generator = threadLocalGenerator();
-    std::uint64_t chunk = 0;
-    int remaining = 0;
+    if constexpr (N == sizeof(std::uint64_t)) {
+        const auto chunk = nextRandom64();
+        std::memcpy(bytes.data(), &chunk, sizeof(chunk));
+    } else if constexpr (N == sizeof(std::uint64_t) * 2) {
+        const std::array chunks{nextRandom64(), nextRandom64()};
+        std::memcpy(bytes.data(), chunks.data(), sizeof(chunks));
+    } else {
+        std::uint64_t chunk = 0;
+        int remaining = 0;
 
-    for (auto& byte : bytes) {
-        if (remaining == 0) {
-            chunk = generator();
-            remaining = 8;
+        for (auto& byte : bytes) {
+            if (remaining == 0) {
+                chunk = nextRandom64();
+                remaining = 8;
+            }
+            byte = static_cast<std::byte>(chunk & 0xffU);
+            chunk >>= 8U;
+            --remaining;
         }
-        byte = static_cast<std::byte>(chunk & 0xffU);
-        chunk >>= 8U;
-        --remaining;
     }
 }
 

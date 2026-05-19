@@ -18,11 +18,18 @@ struct OtlpHttpHeader {
     std::string value;
 };
 
+struct InstrumentationScopeConfig {
+    std::string name{"galay-tracing"};
+    std::string version;
+};
+
 // Configuration for OTLP/HTTP JSON trace export.
 struct OtlpHttpExporterConfig {
     std::string endpoint{"http://127.0.0.1:4318/v1/traces"};
     std::chrono::milliseconds timeout{std::chrono::milliseconds(500)};
     std::vector<OtlpHttpHeader> headers;
+    std::vector<SpanAttribute> resource_attributes;
+    InstrumentationScopeConfig scope;
 };
 
 struct OtlpHttpRequest {

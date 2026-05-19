@@ -49,7 +49,7 @@ struct ErasedLogWriter {
         return object != nullptr && isEnabledFn != nullptr && isEnabledFn(object, level);
     }
 
-    void write(LogRecord record) {
+    void write(LogRecord record) const {
         if (object == nullptr) {
             return;
         }
@@ -68,7 +68,44 @@ struct ErasedLogWriter {
         }
     }
 
-    void write(StructuredLogRecord record);
+    void write(StructuredLogRecord record) const {
+        if (object == nullptr) {
+            return;
+        }
+        if (writeStructuredFn != nullptr) {
+            writeStructuredFn(object, record);
+            return;
+        }
+        writeStructuredFallback(record);
+    }
+
+    void writeStructuredFallback(StructuredLogRecord record) const;
+};
+
+class DefaultLogWriter {
+public:
+    explicit constexpr DefaultLogWriter(const ErasedLogWriter* writer = nullptr) noexcept
+        : m_writer(writer) {
+    }
+
+    [[nodiscard]] bool isEnabled(LogLevel level) const noexcept {
+        return m_writer != nullptr && m_writer->isEnabled(level);
+    }
+
+    void write(LogRecord record) const {
+        if (m_writer != nullptr) {
+            m_writer->write(std::move(record));
+        }
+    }
+
+    void write(StructuredLogRecord record) const {
+        if (m_writer != nullptr) {
+            m_writer->write(record);
+        }
+    }
+
+private:
+    const ErasedLogWriter* m_writer;
 };
 
 template <typename Writer>
@@ -141,7 +178,16 @@ void writeEventUnchecked(
 }
 
 void setDefaultLogWriterRef(ErasedLogWriter writer) noexcept;
+extern std::atomic<const ErasedLogWriter*> g_defaultLogWriterPtr;
+[[nodiscard]] const ErasedLogWriter* builtInDefaultLogWriterPtr() noexcept;
+[[nodiscard]] inline const ErasedLogWriter* defaultLogWriterPtr() noexcept {
+    if (auto* writer = g_defaultLogWriterPtr.load(std::memory_order_acquire); writer != nullptr) {
+        return writer;
+    }
+    return builtInDefaultLogWriterPtr();
+}
 [[nodiscard]] ErasedLogWriter defaultLogWriterRef() noexcept;
+[[nodiscard]] DefaultLogWriter defaultLogWriter() noexcept;
 
 } // namespace detail
 
@@ -346,12 +392,12 @@ private:
 };
 
 // Creates a context-bound logger backed by the current process-wide writer.
-[[nodiscard]] inline ContextLogger<detail::ErasedLogWriter> log(
+[[nodiscard]] inline ContextLogger<detail::DefaultLogWriter> log(
     std::optional<TraceContext> context,
     SourceLocation source = SourceLocation::current()) {
-    return ContextLogger<detail::ErasedLogWriter>(
+    return ContextLogger<detail::DefaultLogWriter>(
         std::move(context),
-        detail::defaultLogWriterRef(),
+        detail::defaultLogWriter(),
         source);
 }
 
@@ -368,12 +414,12 @@ template <LogWriter Writer>
 }
 
 // Creates a context-bound structured event logger backed by the current writer.
-[[nodiscard]] inline ContextEventLogger<detail::ErasedLogWriter> event(
+[[nodiscard]] inline ContextEventLogger<detail::DefaultLogWriter> event(
     std::optional<TraceContext> context,
     SourceLocation source = SourceLocation::current()) {
-    return ContextEventLogger<detail::ErasedLogWriter>(
+    return ContextEventLogger<detail::DefaultLogWriter>(
         std::move(context),
-        detail::defaultLogWriterRef(),
+        detail::defaultLogWriter(),
         source);
 }
 
@@ -391,7 +437,7 @@ template <StructuredLogWriter Writer>
 
 template <LogLevel kLevel, typename... Args>
 void logAt(SourceLocation source, std::format_string<Args...> fmt, Args&&... args) {
-    auto writer = detail::defaultLogWriterRef();
+    auto writer = detail::defaultLogWriter();
     if (!writer.isEnabled(kLevel)) {
         return;
     }
@@ -410,7 +456,7 @@ void logWithContextAt(
     std::optional<TraceContext> context,
     std::format_string<Args...> fmt,
     Args&&... args) {
-    auto writer = detail::defaultLogWriterRef();
+    auto writer = detail::defaultLogWriter();
     if (!writer.isEnabled(kLevel)) {
         return;
     }
@@ -556,6 +602,19 @@ void logError(std::format_string<Args...> fmt, Args&&... args) {
         }                                                                                                   \
     } while (false)
 
+#define GALAY_EVENT_DEFAULT_AT(level, context, name, ...)                                                   \
+    do {                                                                                                    \
+        const auto* galayTracingWriter = ::galay::tracing::detail::defaultLogWriterPtr();                   \
+        constexpr auto galayTracingLevel = (level);                                                         \
+        if (galayTracingWriter != nullptr && galayTracingWriter->isEnabled(galayTracingLevel)) {            \
+            ::galay::tracing::detail::writeEventUnchecked<galayTracingLevel>(                               \
+                *galayTracingWriter,                                                                        \
+                (context),                                                                                  \
+                ::galay::tracing::SourceLocation{__FILE__, __LINE__, __func__},                             \
+                (name) __VA_OPT__(, ) __VA_ARGS__);                                                         \
+        }                                                                                                   \
+    } while (false)
+
 #define GALAY_EVENT_TRACE(writer, context, name, ...) \
     GALAY_EVENT_AT(::galay::tracing::LogLevel::kTrace, writer, context, name __VA_OPT__(, ) __VA_ARGS__)
 #define GALAY_EVENT_DEBUG(writer, context, name, ...) \
@@ -566,3 +625,14 @@ void logError(std::format_string<Args...> fmt, Args&&... args) {
     GALAY_EVENT_AT(::galay::tracing::LogLevel::kWarn, writer, context, name __VA_OPT__(, ) __VA_ARGS__)
 #define GALAY_EVENT_ERROR(writer, context, name, ...) \
     GALAY_EVENT_AT(::galay::tracing::LogLevel::kError, writer, context, name __VA_OPT__(, ) __VA_ARGS__)
+
+#define GALAY_EVENT_TRACE_DEFAULT(context, name, ...) \
+    GALAY_EVENT_DEFAULT_AT(::galay::tracing::LogLevel::kTrace, context, name __VA_OPT__(, ) __VA_ARGS__)
+#define GALAY_EVENT_DEBUG_DEFAULT(context, name, ...) \
+    GALAY_EVENT_DEFAULT_AT(::galay::tracing::LogLevel::kDebug, context, name __VA_OPT__(, ) __VA_ARGS__)
+#define GALAY_EVENT_INFO_DEFAULT(context, name, ...) \
+    GALAY_EVENT_DEFAULT_AT(::galay::tracing::LogLevel::kInfo, context, name __VA_OPT__(, ) __VA_ARGS__)
+#define GALAY_EVENT_WARN_DEFAULT(context, name, ...) \
+    GALAY_EVENT_DEFAULT_AT(::galay::tracing::LogLevel::kWarn, context, name __VA_OPT__(, ) __VA_ARGS__)
+#define GALAY_EVENT_ERROR_DEFAULT(context, name, ...) \
+    GALAY_EVENT_DEFAULT_AT(::galay::tracing::LogLevel::kError, context, name __VA_OPT__(, ) __VA_ARGS__)

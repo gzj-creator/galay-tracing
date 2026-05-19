@@ -37,7 +37,7 @@ BatchSpanProcessor::~BatchSpanProcessor() noexcept {
 }
 
 void BatchSpanProcessor::onEnd(Span span) {
-    if (!span.context().sampled()) {
+    if (!span.spanContext().sampled()) {
         return;
     }
 
