@@ -25,3 +25,11 @@ Maintenance rules:
 - Added direct-include examples for automatic log correlation and W3C trace context propagation.
 - Added a guarded C++23 module facade source layout for supported toolchains.
 - Added release benchmark programs for disabled logs, enabled logs, span scopes, and traceparent parse/inject.
+- Added structured event logging with concept-based writers, `event(ctx).info(...)`, and Rust-like `GALAY_EVENT_*` callsite macros that skip field evaluation when disabled.
+- Added an OTLP/HTTP JSON span exporter with configurable endpoint, headers, custom transports, and an optional `galay-http` backed transport.
+- Added OTLP JSON and structured event benchmarks, plus a Rust `tracing` comparison benchmark.
+
+### Changed
+
+- Switched kernel coroutine tracing from task wrapping to explicit context capture and context-aware logging APIs.
+- Reduced tracing hot-path overhead by using snapshot-based logger sinks, lock-free default writer lookup, thread-local ID generation, and a slimmer `SpanGuard`.

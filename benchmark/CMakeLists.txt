@@ -9,3 +9,9 @@ target_link_libraries(B3-SpanScope PRIVATE galay-tracing::galay-tracing)
 
 add_executable(B4-Traceparent b4_traceparent.cc)
 target_link_libraries(B4-Traceparent PRIVATE galay-tracing::galay-tracing)
+
+add_executable(B5-OtlpJsonExporter b5_otlp_json_exporter.cc)
+target_link_libraries(B5-OtlpJsonExporter PRIVATE galay-tracing::galay-tracing)
+
+add_executable(B6-StructuredEvent b6_structured_event.cc)
+target_link_libraries(B6-StructuredEvent PRIVATE galay-tracing::galay-tracing)

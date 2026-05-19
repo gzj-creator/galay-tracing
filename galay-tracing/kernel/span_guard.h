@@ -20,7 +20,7 @@ public:
     SpanGuard& operator=(SpanGuard&& other) noexcept;
 
     [[nodiscard]] const Span& span() const noexcept {
-        return *m_span;
+        return m_span;
     }
 
     [[nodiscard]] bool active() const noexcept {
@@ -32,7 +32,7 @@ public:
 private:
     void restore() noexcept;
 
-    std::optional<Span> m_span;
+    Span m_span;
     std::optional<TraceContext> m_previousContext;
     bool m_active{false};
 };

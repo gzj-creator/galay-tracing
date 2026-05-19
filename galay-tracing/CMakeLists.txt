@@ -5,6 +5,7 @@ add_library(
     context/traceparent.cc
     kernel/batch_span_processor.cc
     kernel/file_span_exporter.cc
+    kernel/otlp_http_exporter.cc
     kernel/sampler.cc
     kernel/span.cc
     kernel/span_guard.cc
@@ -38,6 +39,13 @@ if(GALAY_TRACING_ENABLE_SPDLOG)
     )
 
     list(APPEND galay_tracing_install_targets galay-tracing-spdlog)
+endif()
+
+if(GALAY_TRACING_ENABLE_OTLP_HTTP)
+    find_package(galay-http CONFIG REQUIRED)
+
+    target_compile_definitions(galay-tracing PUBLIC GALAY_TRACING_ENABLE_OTLP_HTTP=1)
+    target_link_libraries(galay-tracing PUBLIC galay-http::galay-http)
 endif()
 
 if(GALAY_TRACING_ENABLE_KERNEL)

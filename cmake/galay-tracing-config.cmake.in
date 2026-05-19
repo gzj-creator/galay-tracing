@@ -10,6 +10,10 @@ if(@GALAY_TRACING_ENABLE_KERNEL@)
     find_dependency(galay-kernel CONFIG)
 endif()
 
+if(@GALAY_TRACING_ENABLE_OTLP_HTTP@)
+    find_dependency(galay-http CONFIG)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/galay-tracing-targets.cmake")
 
 check_required_components(galay-tracing)

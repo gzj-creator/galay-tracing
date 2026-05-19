@@ -8,6 +8,7 @@
 #include "galay-tracing/context/traceparent.h"
 #include "galay-tracing/kernel/batch_span_processor.h"
 #include "galay-tracing/kernel/file_span_exporter.h"
+#include "galay-tracing/kernel/otlp_http_exporter.h"
 #include "galay-tracing/kernel/sampler.h"
 #include "galay-tracing/kernel/span.h"
 #include "galay-tracing/kernel/span_guard.h"

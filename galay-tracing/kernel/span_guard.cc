@@ -57,8 +57,8 @@ SpanGuard& SpanGuard::operator=(SpanGuard&& other) noexcept {
 }
 
 void SpanGuard::end() noexcept {
-    if (m_span.has_value()) {
-        m_span->end();
+    if (m_active) {
+        m_span.end();
     }
 }
 
@@ -74,7 +74,6 @@ void SpanGuard::restore() noexcept {
         clearCurrentContext();
     }
     m_active = false;
-    m_span.reset();
 }
 
 SpanGuard startSpan(std::string_view name) {

@@ -21,18 +21,36 @@ std::uint64_t fallbackSeed() noexcept {
     return static_cast<std::uint64_t>(now) ^ (counter.fetch_add(1, std::memory_order_relaxed) + 0x9e3779b97f4a7c15ULL);
 }
 
-template <std::size_t N>
-void fillRandomBytes(std::array<std::byte, N>& bytes) noexcept {
+std::uint64_t randomSeed() noexcept {
     try {
         std::random_device device;
-        for (auto& byte : bytes) {
-            byte = static_cast<std::byte>(device() & 0xffU);
-        }
+        const auto high = static_cast<std::uint64_t>(device());
+        const auto low = static_cast<std::uint64_t>(device());
+        return (high << 32U) ^ low ^ fallbackSeed();
     } catch (...) {
-        std::mt19937_64 generator(fallbackSeed());
-        for (auto& byte : bytes) {
-            byte = static_cast<std::byte>(generator() & 0xffU);
+        return fallbackSeed();
+    }
+}
+
+std::mt19937_64& threadLocalGenerator() noexcept {
+    thread_local std::mt19937_64 generator(randomSeed());
+    return generator;
+}
+
+template <std::size_t N>
+void fillRandomBytes(std::array<std::byte, N>& bytes) noexcept {
+    auto& generator = threadLocalGenerator();
+    std::uint64_t chunk = 0;
+    int remaining = 0;
+
+    for (auto& byte : bytes) {
+        if (remaining == 0) {
+            chunk = generator();
+            remaining = 8;
         }
+        byte = static_cast<std::byte>(chunk & 0xffU);
+        chunk >>= 8U;
+        --remaining;
     }
 }
 

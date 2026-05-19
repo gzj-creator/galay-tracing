@@ -35,6 +35,11 @@ target_link_libraries(T7-batch_processor PRIVATE galay-tracing::galay-tracing)
 
 add_test(NAME T7-batch_processor COMMAND T7-batch_processor)
 
+add_executable(T9-otlp_http_exporter t9_otlp_http_exporter.cc)
+target_link_libraries(T9-otlp_http_exporter PRIVATE galay-tracing::galay-tracing)
+
+add_test(NAME T9-otlp_http_exporter COMMAND T9-otlp_http_exporter)
+
 if(GALAY_TRACING_ENABLE_KERNEL)
     add_executable(T8-kernel_context t8_kernel_context.cc)
     target_link_libraries(T8-kernel_context PRIVATE galay-tracing::galay-tracing-kernel)

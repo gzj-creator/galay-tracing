@@ -1,0 +1,7 @@
+.codex/
+.idea/
+.cache/
+build*/
+CMakeFiles/
+install-local/
+galay-http.log
