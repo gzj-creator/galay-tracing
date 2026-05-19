@@ -1,0 +1,16 @@
+if(DEFINED BUILD_TESTS AND NOT DEFINED BUILD_TESTING)
+    set(BUILD_TESTING ${BUILD_TESTS} CACHE BOOL "Build the testing tree." FORCE)
+elseif(NOT DEFINED BUILD_TESTING)
+    set(BUILD_TESTING OFF CACHE BOOL "Build the testing tree." FORCE)
+endif()
+
+if(DEFINED BUILD_TESTS)
+    message(DEPRECATION "BUILD_TESTS is deprecated; use BUILD_TESTING instead.")
+    unset(BUILD_TESTS CACHE)
+endif()
+
+option(BUILD_EXAMPLES "Build galay-tracing examples." ON)
+option(BUILD_BENCHMARKS "Build galay-tracing benchmarks." ON)
+option(GALAY_TRACING_ENABLE_SPDLOG "Enable the optional spdlog adapter." OFF)
+option(GALAY_TRACING_ENABLE_KERNEL "Enable the optional Galay kernel adapter." OFF)
+option(ENABLE_CPP23_MODULES "Enable the optional C++23 module facade." OFF)
