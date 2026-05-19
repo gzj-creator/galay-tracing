@@ -26,7 +26,7 @@ int main() {
         .level = galay::tracing::LogLevel::kInfo,
         .message = "accepted",
         .source = {"test.cc", 9, "main"},
-        .context = context,
+        .context = galay::tracing::makeLogContext(context),
     });
     logger->flush();
 

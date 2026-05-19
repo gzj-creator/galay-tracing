@@ -73,7 +73,7 @@ struct LogRecord {
     LogLevel level{LogLevel::kInfo};
     std::string message;
     SourceLocation source;
-    std::optional<TraceContext> context;
+    std::optional<LogContext> context;
     std::chrono::system_clock::time_point timestamp{std::chrono::system_clock::now()};
 };
 
@@ -84,7 +84,7 @@ struct StructuredLogRecord {
     std::string_view name;
     std::span<const LogField> fields;
     SourceLocation source;
-    std::optional<TraceContext> context;
+    std::optional<LogContext> context;
 };
 
 } // namespace galay::tracing

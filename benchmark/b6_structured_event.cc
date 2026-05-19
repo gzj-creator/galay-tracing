@@ -1,7 +1,9 @@
 #include "galay-tracing/log/logger.h"
+#include "galay-tracing/log/log_sink.h"
 
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <optional>
 
 namespace {
@@ -42,6 +44,15 @@ public:
     galay::tracing::LogLevel minLevel;
     std::size_t count{0};
     std::size_t fieldCount{0};
+};
+
+class NullSink final : public galay::tracing::LogSink {
+public:
+    void write(const galay::tracing::LogRecord&) override {
+        ++count;
+    }
+
+    std::size_t count{0};
 };
 
 [[nodiscard]] const char* buildType() {
@@ -164,6 +175,26 @@ double measureMacroEnabledNs(std::size_t& writes, std::size_t& fields) {
     return static_cast<double>(ns) / kIterations;
 }
 
+double measureLoggerFallbackNs(std::size_t& writes) {
+    constexpr int kIterations = 100000;
+    auto sink = std::make_shared<NullSink>();
+    galay::tracing::Logger logger(galay::tracing::LogLevel::kInfo);
+    logger.clearSinks();
+    logger.addSink(sink);
+
+    const auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < kIterations; ++i) {
+        doNotOptimize(i);
+        galay::tracing::event(std::nullopt, logger)
+            .info("value", galay::tracing::field("value", i));
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
+
+    writes = sink->count;
+    return static_cast<double>(ns) / kIterations;
+}
+
 } // namespace
 
 int main() {
@@ -179,6 +210,8 @@ int main() {
     std::size_t macroFields = 0;
     const double macroDisabled = measureMacroDisabledNs();
     const double macroEnabled = measureMacroEnabledNs(macroWrites, macroFields);
+    std::size_t fallbackWrites = 0;
+    const double loggerFallback = measureLoggerFallbackNs(fallbackWrites);
 
     std::cout << "B6-StructuredEvent workload_disabled=200000 workload_enabled=100000 build=" << buildType()
               << " backend=structured_noop"
@@ -193,5 +226,7 @@ int main() {
               << " macro_disabled_ns_per_event=" << macroDisabled
               << " macro_enabled_ns_per_event=" << macroEnabled
               << " macro_writes=" << macroWrites
-              << " macro_fields=" << macroFields << '\n';
+              << " macro_fields=" << macroFields
+              << " logger_fallback_ns_per_event=" << loggerFallback
+              << " fallback_writes=" << fallbackWrites << '\n';
 }

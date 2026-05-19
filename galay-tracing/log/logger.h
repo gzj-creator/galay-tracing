@@ -136,7 +136,7 @@ void writeEventUnchecked(
         .name = name,
         .fields = std::span<const LogField>(fieldArray.data(), fieldArray.size()),
         .source = source,
-        .context = std::move(context),
+        .context = makeLogContext(std::move(context)),
     });
 }
 
@@ -166,7 +166,7 @@ public:
             .level = level,
             .message = std::format(fmt, std::forward<Args>(args)...),
             .source = source,
-            .context = currentContext(),
+            .context = makeLogContext(currentContext()),
         });
     }
 
@@ -187,7 +187,7 @@ public:
             .level = level,
             .message = std::format(fmt, std::forward<Args>(args)...),
             .source = source,
-            .context = std::move(context),
+            .context = makeLogContext(std::move(context)),
         });
     }
 
@@ -203,7 +203,8 @@ private:
 
     std::atomic<LogLevel> m_level;
     std::mutex m_mutex;
-    std::shared_ptr<const SinkSnapshot> m_sinkSnapshot;
+    std::vector<std::unique_ptr<SinkSnapshot>> m_sinkSnapshots;
+    std::atomic<const SinkSnapshot*> m_sinkSnapshot{nullptr};
 };
 
 [[nodiscard]] Logger& defaultLogger() noexcept;
@@ -236,7 +237,7 @@ template <LogWriter Writer>
 class ContextLogger {
 public:
     ContextLogger(std::optional<TraceContext> context, Writer writer, SourceLocation source)
-        : m_context(std::move(context)),
+        : m_context(makeLogContext(std::move(context))),
           m_writer(std::move(writer)),
           m_source(source) {
     }
@@ -281,7 +282,7 @@ private:
         });
     }
 
-    std::optional<TraceContext> m_context;
+    std::optional<LogContext> m_context;
     Writer m_writer;
     SourceLocation m_source;
 };
@@ -292,7 +293,7 @@ template <StructuredLogWriter Writer>
 class ContextEventLogger {
 public:
     ContextEventLogger(std::optional<TraceContext> context, Writer writer, SourceLocation source)
-        : m_context(std::move(context)),
+        : m_context(makeLogContext(std::move(context))),
           m_writer(std::move(writer)),
           m_source(source) {
     }
@@ -339,7 +340,7 @@ private:
         });
     }
 
-    std::optional<TraceContext> m_context;
+    std::optional<LogContext> m_context;
     Writer m_writer;
     SourceLocation m_source;
 };
@@ -399,7 +400,7 @@ void logAt(SourceLocation source, std::format_string<Args...> fmt, Args&&... arg
         .level = kLevel,
         .message = std::format(fmt, std::forward<Args>(args)...),
         .source = source,
-        .context = currentContext(),
+        .context = makeLogContext(currentContext()),
     });
 }
 
@@ -418,7 +419,7 @@ void logWithContextAt(
         .level = kLevel,
         .message = std::format(fmt, std::forward<Args>(args)...),
         .source = source,
-        .context = std::move(context),
+        .context = makeLogContext(std::move(context)),
     });
 }
 

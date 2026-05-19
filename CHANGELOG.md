@@ -33,3 +33,5 @@ Maintenance rules:
 
 - Switched kernel coroutine tracing from task wrapping to explicit context capture and context-aware logging APIs.
 - Reduced tracing hot-path overhead by using snapshot-based logger sinks, lock-free default writer lookup, thread-local ID generation, and a slimmer `SpanGuard`.
+- Split lightweight `LogContext` from full `TraceContext` so log records keep trace/span identity without copying tracestate or parent span metadata.
+- Reduced logger fallback overhead by avoiding sink snapshot reference-count churn and by tightening structured-event fallback formatting.

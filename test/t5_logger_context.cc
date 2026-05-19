@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -29,6 +30,13 @@ struct std::formatter<ExplodingFormat> {
 };
 
 namespace {
+
+static_assert(std::is_same_v<
+    decltype(std::declval<galay::tracing::LogRecord>().context),
+    std::optional<galay::tracing::LogContext>>);
+static_assert(sizeof(galay::tracing::LogContext) <= 32);
+static_assert(sizeof(std::optional<galay::tracing::LogContext>) <= 40);
+static_assert(sizeof(galay::tracing::LogContext) < sizeof(galay::tracing::TraceContext));
 
 class TestSink final : public galay::tracing::LogSink {
 public:
@@ -81,7 +89,7 @@ public:
     std::size_t fieldCount{0};
     std::string firstFieldName;
     std::int64_t firstFieldValue{0};
-    std::optional<galay::tracing::TraceContext> context;
+    std::optional<galay::tracing::LogContext> context;
 };
 
 class RefcountSink final : public galay::tracing::LogSink {

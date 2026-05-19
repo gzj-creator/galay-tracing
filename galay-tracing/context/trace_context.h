@@ -78,4 +78,69 @@ private:
     std::string m_tracestate;
 };
 
+// Lightweight trace identity copied into log records. It intentionally omits
+// tracestate and parent span id; propagation and exporters keep using TraceContext.
+class LogContext {
+public:
+    LogContext() = default;
+
+    explicit constexpr LogContext(TraceId traceId, SpanId spanId, std::uint8_t traceFlags = 0) noexcept
+        : m_traceId(traceId),
+          m_spanId(spanId),
+          m_traceFlags(traceFlags) {
+    }
+
+    explicit LogContext(const TraceContext& context) noexcept
+        : LogContext(context.traceId(), context.spanId(), context.traceFlags()) {
+    }
+
+    [[nodiscard]] bool isValid() const noexcept {
+        return m_traceId.isValid() && m_spanId.isValid();
+    }
+
+    [[nodiscard]] const TraceId& traceId() const noexcept {
+        return m_traceId;
+    }
+
+    [[nodiscard]] const SpanId& spanId() const noexcept {
+        return m_spanId;
+    }
+
+    [[nodiscard]] std::uint8_t traceFlags() const noexcept {
+        return m_traceFlags;
+    }
+
+    [[nodiscard]] bool sampled() const noexcept {
+        return (m_traceFlags & kSampledFlag) != 0;
+    }
+
+    friend bool operator==(const LogContext&, const LogContext&) noexcept = default;
+
+private:
+    static constexpr std::uint8_t kSampledFlag = 0x01;
+
+    TraceId m_traceId{};
+    SpanId m_spanId{};
+    std::uint8_t m_traceFlags{0};
+};
+
+[[nodiscard]] inline std::optional<LogContext> makeLogContext(const std::optional<TraceContext>& context) {
+    if (!context.has_value()) {
+        return std::nullopt;
+    }
+    return LogContext(*context);
+}
+
+[[nodiscard]] inline std::optional<LogContext> makeLogContext(std::optional<TraceContext>&& context) {
+    return makeLogContext(context);
+}
+
+[[nodiscard]] inline std::optional<LogContext> makeLogContext(const TraceContext& context) {
+    return LogContext(context);
+}
+
+[[nodiscard]] constexpr std::optional<LogContext> makeLogContext(std::nullopt_t) noexcept {
+    return std::nullopt;
+}
+
 } // namespace galay::tracing

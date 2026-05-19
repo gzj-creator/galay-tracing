@@ -3,6 +3,8 @@
 #include "galay-tracing/log/console_sink.h"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <format>
 #include <memory>
 #include <mutex>
@@ -50,13 +52,22 @@ std::atomic<const DefaultLogWriterSnapshot*> g_defaultWriterSnapshot{nullptr};
 }
 
 void appendFieldValue(std::string& message, const LogFieldValue& value) {
+    std::array<char, 32> buffer{};
     switch (value.type) {
-    case LogFieldType::kInt64:
-        message.append(std::to_string(value.int64_value));
+    case LogFieldType::kInt64: {
+        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.int64_value);
+        if (error == std::errc{}) {
+            message.append(buffer.data(), static_cast<std::size_t>(end - buffer.data()));
+        }
         break;
-    case LogFieldType::kUInt64:
-        message.append(std::to_string(value.uint64_value));
+    }
+    case LogFieldType::kUInt64: {
+        auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value.uint64_value);
+        if (error == std::errc{}) {
+            message.append(buffer.data(), static_cast<std::size_t>(end - buffer.data()));
+        }
         break;
+    }
     case LogFieldType::kDouble:
         message.append(std::to_string(value.double_value));
         break;
@@ -70,7 +81,18 @@ void appendFieldValue(std::string& message, const LogFieldValue& value) {
 }
 
 [[nodiscard]] LogRecord makeLogRecord(StructuredLogRecord record) {
-    std::string message(record.name);
+    std::size_t estimatedSize = record.name.size();
+    for (const auto& field : record.fields) {
+        estimatedSize += field.name.size() + 2;
+        if (field.value.type == LogFieldType::kString) {
+            estimatedSize += field.value.string_value.size();
+        } else {
+            estimatedSize += 24;
+        }
+    }
+    std::string message;
+    message.reserve(estimatedSize);
+    message.append(record.name);
     for (const auto& field : record.fields) {
         message.push_back(' ');
         message.append(field.name);
@@ -132,8 +154,11 @@ ErasedLogWriter defaultLogWriterRef() noexcept {
 } // namespace detail
 
 Logger::Logger(LogLevel level) noexcept
-    : m_level(level),
-      m_sinkSnapshot(std::make_shared<SinkSnapshot>()) {
+    : m_level(level) {
+    auto snapshot = std::make_unique<SinkSnapshot>();
+    auto* snapshotPtr = snapshot.get();
+    m_sinkSnapshots.push_back(std::move(snapshot));
+    m_sinkSnapshot.store(snapshotPtr, std::memory_order_release);
 }
 
 void Logger::setLevel(LogLevel level) noexcept {
@@ -155,17 +180,24 @@ void Logger::addSink(std::shared_ptr<LogSink> sink) {
     }
 
     std::lock_guard lock(m_mutex);
-    auto next = std::make_shared<SinkSnapshot>();
-    if (auto current = std::atomic_load_explicit(&m_sinkSnapshot, std::memory_order_acquire); current) {
+    auto next = std::make_unique<SinkSnapshot>();
+    if (auto* current = m_sinkSnapshot.load(std::memory_order_acquire); current != nullptr) {
         next->sinks = current->sinks;
     }
     next->sinks.push_back(std::move(sink));
-    std::atomic_store_explicit(&m_sinkSnapshot, std::shared_ptr<const SinkSnapshot>(std::move(next)), std::memory_order_release);
+    auto* snapshotPtr = next.get();
+    m_sinkSnapshots.push_back(std::move(next));
+    m_sinkSnapshot.store(snapshotPtr, std::memory_order_release);
 }
 
 void Logger::clearSinks() {
     std::lock_guard lock(m_mutex);
-    std::atomic_store_explicit(&m_sinkSnapshot, std::shared_ptr<const SinkSnapshot>(std::make_shared<SinkSnapshot>()), std::memory_order_release);
+    auto next = std::make_unique<SinkSnapshot>();
+    auto* snapshotPtr = next.get();
+    // Old snapshots stay owned by the logger so lock-free readers that already
+    // loaded a previous pointer can finish without taking the configuration lock.
+    m_sinkSnapshots.push_back(std::move(next));
+    m_sinkSnapshot.store(snapshotPtr, std::memory_order_release);
 }
 
 void Logger::write(LogRecord record) {
@@ -177,8 +209,8 @@ void Logger::write(StructuredLogRecord record) {
 }
 
 void Logger::publish(LogRecord record) {
-    const auto snapshot = std::atomic_load_explicit(&m_sinkSnapshot, std::memory_order_acquire);
-    if (!snapshot) {
+    const auto* snapshot = m_sinkSnapshot.load(std::memory_order_acquire);
+    if (snapshot == nullptr) {
         return;
     }
 
