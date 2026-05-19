@@ -19,3 +19,6 @@ Maintenance rules:
 - Added W3C `traceparent` extraction/injection with opaque `tracestate` preservation.
 - Added thread-local trace context storage, `Span`, and move-only `SpanGuard` scope restoration.
 - Added a trace-aware logger facade, source location capture macros, log sink interface, and console sink.
+- Added optional `SpdlogSink` adapter target that renders snapshotted trace fields without relying on MDC.
+- Added a bounded batch span processor, sampler interfaces, span exporter interfaces, and JSON-lines file exporter.
+- Added optional `galay-kernel` task context capture adapter for coroutine propagation.

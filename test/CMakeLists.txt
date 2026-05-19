@@ -22,3 +22,22 @@ add_executable(T5-logger_context t5_logger_context.cc)
 target_link_libraries(T5-logger_context PRIVATE galay-tracing::galay-tracing)
 
 add_test(NAME T5-logger_context COMMAND T5-logger_context)
+
+if(GALAY_TRACING_ENABLE_SPDLOG)
+    add_executable(T6-spdlog_sink t6_spdlog_sink.cc)
+    target_link_libraries(T6-spdlog_sink PRIVATE galay-tracing::galay-tracing-spdlog)
+
+    add_test(NAME T6-spdlog_sink COMMAND T6-spdlog_sink)
+endif()
+
+add_executable(T7-batch_processor t7_batch_processor.cc)
+target_link_libraries(T7-batch_processor PRIVATE galay-tracing::galay-tracing)
+
+add_test(NAME T7-batch_processor COMMAND T7-batch_processor)
+
+if(GALAY_TRACING_ENABLE_KERNEL)
+    add_executable(T8-kernel_context t8_kernel_context.cc)
+    target_link_libraries(T8-kernel_context PRIVATE galay-tracing::galay-tracing-kernel)
+
+    add_test(NAME T8-kernel_context COMMAND T8-kernel_context)
+endif()
