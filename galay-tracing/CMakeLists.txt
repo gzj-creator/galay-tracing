@@ -1,4 +1,13 @@
-add_library(galay-tracing common/id_format.cc)
+add_library(
+    galay-tracing
+    common/id_format.cc
+    context/context_storage.cc
+    context/traceparent.cc
+    kernel/span.cc
+    kernel/span_guard.cc
+    log/console_sink.cc
+    log/logger.cc
+)
 add_library(galay-tracing::galay-tracing ALIAS galay-tracing)
 
 target_compile_features(galay-tracing PUBLIC cxx_std_23)

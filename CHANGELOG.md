@@ -16,3 +16,6 @@ Maintenance rules:
 - Added the initial CMake package skeleton, install export configuration, and package surface smoke test.
 - Added `TraceId` and `SpanId` fixed-size identifier types with hex parsing, lowercase formatting, non-zero validation, random generation, binary accessors, and equality.
 - Added Task 2 trace identifier test coverage and CTest registration.
+- Added W3C `traceparent` extraction/injection with opaque `tracestate` preservation.
+- Added thread-local trace context storage, `Span`, and move-only `SpanGuard` scope restoration.
+- Added a trace-aware logger facade, source location capture macros, log sink interface, and console sink.
