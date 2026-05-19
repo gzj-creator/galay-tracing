@@ -22,3 +22,6 @@ Maintenance rules:
 - Added optional `SpdlogSink` adapter target that renders snapshotted trace fields without relying on MDC.
 - Added a bounded batch span processor, sampler interfaces, span exporter interfaces, and JSON-lines file exporter.
 - Added optional `galay-kernel` task context capture adapter for coroutine propagation.
+- Added direct-include examples for automatic log correlation and W3C trace context propagation.
+- Added a guarded C++23 module facade source layout for supported toolchains.
+- Added release benchmark programs for disabled logs, enabled logs, span scopes, and traceparent parse/inject.
