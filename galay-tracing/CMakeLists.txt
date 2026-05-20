@@ -15,6 +15,9 @@ add_library(
 add_library(galay-tracing::galay-tracing ALIAS galay-tracing)
 set(galay_tracing_install_targets galay-tracing)
 
+find_package(galay-kernel 5.0.0 CONFIG REQUIRED)
+
+set_property(TARGET galay-tracing PROPERTY NO_SYSTEM_FROM_IMPORTED ON)
 target_compile_features(galay-tracing PUBLIC cxx_std_23)
 
 target_include_directories(
@@ -23,6 +26,8 @@ target_include_directories(
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
         $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(galay-tracing PUBLIC galay-kernel::galay-kernel)
 
 if(GALAY_TRACING_ENABLE_SPDLOG)
     find_package(spdlog CONFIG REQUIRED)
@@ -42,15 +47,13 @@ if(GALAY_TRACING_ENABLE_SPDLOG)
 endif()
 
 if(GALAY_TRACING_ENABLE_OTLP_HTTP)
-    find_package(galay-http CONFIG REQUIRED)
+    find_package(galay-http 3.1.0 CONFIG REQUIRED)
 
     target_compile_definitions(galay-tracing PUBLIC GALAY_TRACING_ENABLE_OTLP_HTTP=1)
     target_link_libraries(galay-tracing PUBLIC galay-http::galay-http)
 endif()
 
 if(GALAY_TRACING_ENABLE_KERNEL)
-    find_package(galay-kernel CONFIG REQUIRED)
-
     add_library(galay-tracing-kernel INTERFACE)
     add_library(galay-tracing::galay-tracing-kernel ALIAS galay-tracing-kernel)
 

@@ -11,6 +11,20 @@ Maintenance rules:
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-05-20
+
+### Added
+
+- Added `galay::tracing::log::set/get` for tracing-internal diagnostics backed by `galay-kernel` `BaseLogger`.
+- Added `TRACING_LOG_*` macros and internal diagnostics for batch span processing and OTLP/HTTP export failure paths.
+- Added `T10-base_logger` coverage to verify disabled and level-filtered diagnostics do not evaluate formatting arguments.
+
+### Changed
+
+- Kept tracing business correlation logs on the existing `Logger` / `LogSink` / `GALAY_LOG_*` model while separating internal library diagnostics into `BaseLogger`.
+- Bumped the CMake package version to `0.2.0`.
+- Required `galay-kernel 5.0.0` and aligned the optional OTLP/HTTP dependency to `galay-http 3.1.0`.
+
 ### Added
 
 - Added the initial CMake package skeleton, install export configuration, and package surface smoke test.

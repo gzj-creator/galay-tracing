@@ -2,16 +2,14 @@
 
 include(CMakeFindDependencyMacro)
 
+find_dependency(galay-kernel 5.0.0 CONFIG)
+
 if(@GALAY_TRACING_ENABLE_SPDLOG@)
     find_dependency(spdlog CONFIG)
 endif()
 
-if(@GALAY_TRACING_ENABLE_KERNEL@)
-    find_dependency(galay-kernel CONFIG)
-endif()
-
 if(@GALAY_TRACING_ENABLE_OTLP_HTTP@)
-    find_dependency(galay-http CONFIG)
+    find_dependency(galay-http 3.1.0 CONFIG)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/galay-tracing-targets.cmake")

@@ -1,5 +1,7 @@
 #include "galay-tracing/kernel/otlp_http_exporter.h"
 
+#include "galay-tracing/common/tracing_log.h"
+
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -445,6 +447,10 @@ ExportResult OtlpHttpExporter::exportSpans(std::span<const Span> spans) {
         return ExportResult::kSuccess;
     }
 
+    TRACING_LOG_DEBUG("[otlp_http_exporter]", "export spans span_count={} endpoint={}",
+                      spans.size(),
+                      m_config.endpoint);
+
     OtlpHttpResponse response;
     try {
         response = m_transport(OtlpHttpRequest{
@@ -455,12 +461,21 @@ ExportResult OtlpHttpExporter::exportSpans(std::span<const Span> spans) {
             .body = buildOtlpJsonBody(spans, m_config),
         });
     } catch (...) {
+        TRACING_LOG_ERROR("[otlp_http_exporter]", "transport threw span_count={}", spans.size());
         return ExportResult::kFailure;
     }
 
-    return response.status_code >= 200 && response.status_code < 300
-        ? ExportResult::kSuccess
-        : ExportResult::kFailure;
+    if (response.status_code >= 200 && response.status_code < 300) {
+        TRACING_LOG_DEBUG("[otlp_http_exporter]", "export succeeded status={} body_size={}",
+                          response.status_code,
+                          response.body.size());
+        return ExportResult::kSuccess;
+    }
+
+    TRACING_LOG_WARN("[otlp_http_exporter]", "export failed status={} error={}",
+                     response.status_code,
+                     response.error);
+    return ExportResult::kFailure;
 }
 
 bool OtlpHttpExporter::forceFlush(std::chrono::milliseconds) {

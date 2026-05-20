@@ -1,5 +1,7 @@
 #include "galay-tracing/kernel/batch_span_processor.h"
 
+#include "galay-tracing/common/tracing_log.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -30,6 +32,10 @@ BatchSpanProcessor::BatchSpanProcessor(std::unique_ptr<SpanExporter> exporter, B
     : m_exporter(std::move(exporter)),
       m_config(normalizeConfig(config)),
       m_worker(&BatchSpanProcessor::workerLoop, this) {
+    TRACING_LOG_INFO("[batch_processor]", "created queue_capacity={} max_batch_size={} flush_interval_ms={}",
+                     m_config.queue_capacity,
+                     m_config.max_batch_size,
+                     m_config.flush_interval.count());
 }
 
 BatchSpanProcessor::~BatchSpanProcessor() noexcept {
@@ -50,6 +56,8 @@ void BatchSpanProcessor::onEnd(Span span) {
 
         if (m_queue.size() >= m_config.queue_capacity) {
             m_droppedSpans.fetch_add(1, std::memory_order_relaxed);
+            TRACING_LOG_WARN("[batch_processor]", "drop sampled span because queue is full capacity={}",
+                             m_config.queue_capacity);
             return;
         }
 
@@ -78,6 +86,9 @@ bool BatchSpanProcessor::forceFlush(std::chrono::milliseconds timeout) {
         std::lock_guard exportLock(m_exportMutex);
         ok = m_exporter->forceFlush(timeout) && ok;
     }
+    if (!ok) {
+        TRACING_LOG_WARN("[batch_processor]", "forceFlush finished with failure timeout_ms={}", timeout.count());
+    }
     return ok && std::chrono::steady_clock::now() <= deadline;
 }
 
@@ -104,6 +115,11 @@ bool BatchSpanProcessor::shutdown(std::chrono::milliseconds timeout) {
         m_exporterShutdown = true;
     }
 
+    if (!ok) {
+        TRACING_LOG_WARN("[batch_processor]", "shutdown finished with failure timeout_ms={}", timeout.count());
+    } else if (TRACING_LOG_ENABLED(::galay::kernel::LogLevel::kDebug)) {
+        TRACING_LOG_DEBUG("[batch_processor]", "shutdown finished dropped_spans={}", droppedSpanCount());
+    }
     return ok && std::chrono::steady_clock::now() <= deadline;
 }
 
@@ -149,7 +165,13 @@ bool BatchSpanProcessor::exportBatch(std::span<const Span> spans) {
     }
 
     std::lock_guard exportLock(m_exportMutex);
-    return m_exporter->exportSpans(spans) == ExportResult::kSuccess;
+    const bool success = m_exporter->exportSpans(spans) == ExportResult::kSuccess;
+    if (!success) {
+        TRACING_LOG_WARN("[batch_processor]", "export batch failed span_count={}", spans.size());
+    } else if (TRACING_LOG_ENABLED(::galay::kernel::LogLevel::kDebug)) {
+        TRACING_LOG_DEBUG("[batch_processor]", "export batch succeeded span_count={}", spans.size());
+    }
+    return success;
 }
 
 } // namespace galay::tracing
