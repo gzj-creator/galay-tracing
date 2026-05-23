@@ -1,3 +1,13 @@
+/**
+ * @file context_storage.cc
+ * @brief 线程本地追踪上下文的存储与访问实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 基于 thread_local 实现当前线程活跃 TraceContext 的获取、设置和清除，
+ * 支持 SpanContext 与 tracestate 的联合序列化状态管理。
+ */
+
 #include "galay-tracing/context/context_storage.h"
 
 #include <utility>

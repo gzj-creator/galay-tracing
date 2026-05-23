@@ -1,3 +1,13 @@
+/**
+ * @file otlp_http_exporter.cc
+ * @brief OTLP/HTTP JSON Span 导出器实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现 Span 到 OTLP JSON 的序列化、请求构建和 HTTP 传输。
+ * 可选启用基于 galay-http 协程的内置传输，或由用户提供自定义传输函数。
+ */
+
 #include "galay-tracing/kernel/otlp_http_exporter.h"
 
 #include "galay-tracing/common/tracing_log.h"

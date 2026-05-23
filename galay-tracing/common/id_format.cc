@@ -1,3 +1,13 @@
+/**
+ * @file id_format.cc
+ * @brief 追踪标识符的十六进制解析、格式化与随机生成实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现十六进制字符串与字节数组的双向转换，以及基于 SplitMix64
+ * 伪随机数生成器的 TraceId / SpanId 随机生成。
+ */
+
 #include "galay-tracing/common/id_format.h"
 
 #include "galay-tracing/common/span_id.h"

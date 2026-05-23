@@ -27,9 +27,9 @@ public:
 
     /**
      * @brief 处理已结束的 Span
-     * @param span 已结束的 Span（通过移动语义传递）
+     * @param span 已结束的 Span（调用方移交所有权，处理器可异步保存）
      */
-    virtual void onEnd(Span span) = 0;
+    virtual void onEnd(Span&& span) = 0;
 
     /**
      * @brief 强制刷新所有待处理的 Span

@@ -1,3 +1,13 @@
+/**
+ * @file traceparent.cc
+ * @brief W3C Trace Context traceparent/tracestate 解析与注入实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现 W3C traceparent 头的严格格式校验与解析，以及将 TraceContext
+ * 序列化为标准 traceparent 字符串用于出站传播。
+ */
+
 #include "galay-tracing/context/traceparent.h"
 
 #include "galay-tracing/common/id_format.h"

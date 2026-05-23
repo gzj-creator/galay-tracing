@@ -15,15 +15,21 @@
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstddef>
-#include <deque>
 #include <memory>
-#include <mutex>
 #include <thread>
 #include <vector>
 
 namespace galay::tracing {
+
+/**
+ * @brief 批处理器后台线程的唤醒策略
+ */
+enum class BatchSpanScheduleMode {
+    kTimed,      ///< 仅按 flush_interval 定时唤醒，forceFlush/shutdown 仍会立即唤醒
+    kOnEnd,      ///< 每次成功入队一个 sampled Span 后唤醒后台线程
+    kBatchSize,  ///< 队列中 Span 数量达到 max_batch_size 后唤醒后台线程
+};
 
 /**
  * @brief 批量处理器的配置参数
@@ -32,6 +38,7 @@ struct BatchSpanProcessorConfig {
     std::size_t queue_capacity{2048};  ///< 内部队列容量，超出时丢弃新 Span
     std::size_t max_batch_size{512};   ///< 单次导出的最大批大小
     std::chrono::milliseconds flush_interval{std::chrono::milliseconds(5000)}; ///< 定时刷新间隔
+    BatchSpanScheduleMode schedule_mode{BatchSpanScheduleMode::kBatchSize}; ///< 后台线程唤醒策略
 };
 
 /**
@@ -62,7 +69,7 @@ public:
      * @details 队列满时丢弃 Span 并增加丢弃计数
      * @param span 已结束的 Span
      */
-    void onEnd(Span span) override;
+    void onEnd(Span&& span) override;
 
     /**
      * @brief 强制刷新队列中所有 Span
@@ -85,6 +92,9 @@ public:
     [[nodiscard]] std::size_t droppedSpanCount() const noexcept;
 
 private:
+    struct SpanQueue;
+    struct WorkerControl;
+
     /**
      * @brief 后台工作线程的主循环
      */
@@ -92,10 +102,11 @@ private:
 
     /**
      * @brief 从队列中取出最多 maxCount 个 Span
+     * @param batch 接收取出结果的复用向量，前返回值个元素为本次取出的 Span
      * @param maxCount 最大取出数量
-     * @return 取出的 Span 向量
+     * @return 实际取出的 Span 数量
      */
-    [[nodiscard]] std::vector<Span> drainQueue(std::size_t maxCount);
+    [[nodiscard]] std::size_t drainQueue(std::vector<Span>& batch, std::size_t maxCount);
 
     /**
      * @brief 将一批 Span 导出到后端
@@ -106,14 +117,10 @@ private:
 
     std::unique_ptr<SpanExporter> m_exporter;       ///< Span 导出器
     BatchSpanProcessorConfig m_config;              ///< 批处理配置
-    mutable std::mutex m_mutex;                     ///< 队列互斥锁
-    std::condition_variable m_condition;            ///< 条件变量（通知工作线程）
-    std::deque<Span> m_queue;                       ///< Span 缓冲队列
-    std::mutex m_exportMutex;                       ///< 导出互斥锁
-    std::thread m_worker;                           ///< 后台工作线程
+    std::unique_ptr<SpanQueue> m_queue;             ///< 基于 moodycamel ConcurrentQueue 的 Span 队列
+    std::unique_ptr<WorkerControl> m_control;       ///< 后台线程的原子控制通道
     std::atomic<std::size_t> m_droppedSpans{0};     ///< 丢弃的 Span 计数
-    bool m_shutdown{false};                         ///< 是否已关闭
-    bool m_exporterShutdown{false};                 ///< 导出器是否已关闭
+    std::thread m_worker;                           ///< 后台工作线程
 };
 
 } // namespace galay::tracing

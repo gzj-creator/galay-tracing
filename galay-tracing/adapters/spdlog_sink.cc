@@ -1,3 +1,13 @@
+/**
+ * @file spdlog_sink.cc
+ * @brief 基于 spdlog 的日志输出适配器实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 将 galay-tracing 的 LogRecord 格式化为字符串并转发到 spdlog::logger，
+ * 自动映射日志级别到 spdlog 对应的级别枚举。
+ */
+
 #include "galay-tracing/adapters/spdlog_sink.h"
 
 #include "galay-tracing/log/log_level.h"

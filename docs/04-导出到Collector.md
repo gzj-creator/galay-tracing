@@ -48,6 +48,7 @@ galay::tracing::BatchSpanProcessor processor(std::move(exporter), {
     .queue_capacity = 4096,
     .max_batch_size = 512,
     .flush_interval = std::chrono::milliseconds(500),
+    .schedule_mode = galay::tracing::BatchSpanScheduleMode::kBatchSize,
 });
 
 galay::tracing::Span span("operation", context);
@@ -55,6 +56,8 @@ span.end();
 processor.onEnd(std::move(span));
 processor.forceFlush(std::chrono::seconds(2));
 ```
+
+`schedule_mode` 控制后台批处理线程的唤醒策略：`kTimed` 仅按 `flush_interval` 定时处理，`kOnEnd` 每次 sampled span 入队后唤醒，`kBatchSize` 在队列达到 `max_batch_size` 后唤醒。`forceFlush()` 和 `shutdown()` 始终会立即唤醒后台线程并排空队列。
 
 当前版本没有全局 tracer provider，也没有自动把 `SpanGuard` 结束事件送进 processor。生产接入时需要在边界层或业务封装里显式调用 `processor.onEnd(...)`。
 

@@ -1,3 +1,13 @@
+/**
+ * @file file_span_exporter.cc
+ * @brief 基于文件的 Span 导出器实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 将 Span 以 JSON Lines 格式追加写入本地文件，
+ * 内部使用互斥锁保证线程安全的批量写入和文件刷新。
+ */
+
 #include "galay-tracing/kernel/file_span_exporter.h"
 
 #include <string>

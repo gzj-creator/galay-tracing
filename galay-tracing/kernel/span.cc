@@ -1,3 +1,13 @@
+/**
+ * @file span.cc
+ * @brief Span 核心数据类型与属性操作实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现 SpanAttributeValue 的类型安全存取、SpanAttribute 工厂函数、
+ * 全局 Span 时间策略管理，以及 Span 的构造、属性设置和生命周期控制。
+ */
+
 #include "galay-tracing/kernel/span.h"
 
 #include <atomic>

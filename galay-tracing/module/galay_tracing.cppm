@@ -1,3 +1,14 @@
+/**
+ * @file galay_tracing.cppm
+ * @brief galay-tracing C++20 模块定义
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 将 galay-tracing 库的所有公共类型和函数导出为 C++20 命名模块
+ * galay.tracing，包括：追踪标识符、上下文管理、Span 核心类型、
+ * 处理器/导出器、采样器、日志系统及便捷函数。
+ */
+
 module;
 
 #include "galay-tracing/module/module_prelude.hpp"
@@ -9,6 +20,7 @@ using ::galay::tracing::AlwaysOffSampler;
 using ::galay::tracing::AlwaysOnSampler;
 using ::galay::tracing::BatchSpanProcessor;
 using ::galay::tracing::BatchSpanProcessorConfig;
+using ::galay::tracing::BatchSpanScheduleMode;
 using ::galay::tracing::ConsoleSink;
 using ::galay::tracing::ExportResult;
 using ::galay::tracing::FileSpanExporter;

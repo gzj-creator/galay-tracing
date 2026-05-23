@@ -27,6 +27,13 @@ target_include_directories(
         $<INSTALL_INTERFACE:include>
 )
 
+target_include_directories(
+    galay-tracing
+    SYSTEM
+    PRIVATE
+        "${PROJECT_SOURCE_DIR}/third_party/moodycamel"
+)
+
 target_link_libraries(galay-tracing PUBLIC galay-kernel::galay-kernel)
 
 if(GALAY_TRACING_ENABLE_SPDLOG)

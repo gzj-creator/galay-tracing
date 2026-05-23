@@ -1,3 +1,14 @@
+/**
+ * @file logger.cc
+ * @brief 日志系统核心：Logger、Writer、全局 API 实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现 Logger 的 Sink 快照管理（无锁读取 + 写时复制）、
+ * 类型擦除写入器的全局配置、结构化事件到普通日志的降级转换，
+ * 以及进程级默认 Logger 和默认写入器的管理。
+ */
+
 #include "galay-tracing/log/logger.h"
 
 #include "galay-tracing/log/console_sink.h"

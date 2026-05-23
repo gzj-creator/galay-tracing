@@ -15,3 +15,9 @@ target_link_libraries(B5-OtlpJsonExporter PRIVATE galay-tracing::galay-tracing)
 
 add_executable(B6-StructuredEvent b6_structured_event.cc)
 target_link_libraries(B6-StructuredEvent PRIVATE galay-tracing::galay-tracing)
+
+add_executable(B7-BatchProcessorSchedule b7_batch_processor_schedule.cc)
+target_link_libraries(B7-BatchProcessorSchedule PRIVATE galay-tracing::galay-tracing)
+
+add_executable(B8-MoodycamelBatchQueue b8_moodycamel_batch_queue.cc)
+target_include_directories(B8-MoodycamelBatchQueue SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/third_party/moodycamel")

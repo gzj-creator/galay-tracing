@@ -1,3 +1,13 @@
+/**
+ * @file sampler.cc
+ * @brief 追踪采样器接口与内置实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现四种内置采样策略：始终采样、始终不采样、基于父 Span 采样决策
+ * 和基于 TraceId 高 64 位比例的采样。通过原子指针支持全局采样器热替换。
+ */
+
 #include "galay-tracing/kernel/sampler.h"
 
 #include <algorithm>

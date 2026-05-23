@@ -1,3 +1,13 @@
+/**
+ * @file span_guard.cc
+ * @brief Span RAII 守卫与自动 Span 创建函数实现
+ * @author galay-tracing
+ * @version 1.0.0
+ *
+ * @details 实现 SpanGuard 的移动语义、上下文保存/恢复逻辑，
+ * 以及 startSpan 和 startServerSpan 便捷函数中的采样决策和上下文传播。
+ */
+
 #include "galay-tracing/kernel/span_guard.h"
 
 #include "galay-tracing/context/context_storage.h"
