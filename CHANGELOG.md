@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 - 新增 benchmark B7-BatchProcessorSchedule 和 B8-MoodycamelBatchQueue
 - Rust 对比基准新增 R5-RustCrossbeamBatchProcessor 和 R6-RustCrossbeamArrayQueueBatchSize
-- 引入 third_party/moodycamel 作为 ConcurrentQueue 依赖
+- 通过 CMake 查找系统安装的 moodycamel ConcurrentQueue 依赖
 - 为所有 .cc 实现文件和 .cppm 模块文件补充中文 Doxygen 文件级注释
 
 ### Docs

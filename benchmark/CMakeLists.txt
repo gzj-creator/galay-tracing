@@ -20,4 +20,4 @@ add_executable(B7-BatchProcessorSchedule b7_batch_processor_schedule.cc)
 target_link_libraries(B7-BatchProcessorSchedule PRIVATE galay-tracing::galay-tracing)
 
 add_executable(B8-MoodycamelBatchQueue b8_moodycamel_batch_queue.cc)
-target_include_directories(B8-MoodycamelBatchQueue SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/third_party/moodycamel")
+target_include_directories(B8-MoodycamelBatchQueue SYSTEM PRIVATE "${MOODYCAMEL_CONCURRENTQUEUE_INCLUDE_DIR}")

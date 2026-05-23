@@ -31,7 +31,7 @@ target_include_directories(
     galay-tracing
     SYSTEM
     PRIVATE
-        "${PROJECT_SOURCE_DIR}/third_party/moodycamel"
+        "${MOODYCAMEL_CONCURRENTQUEUE_INCLUDE_DIR}"
 )
 
 target_link_libraries(galay-tracing PUBLIC galay-kernel::galay-kernel)

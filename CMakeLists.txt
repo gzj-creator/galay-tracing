@@ -14,6 +14,21 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 include(cmake/option.cmake)
 include(CTest)
 
+find_path(
+    MOODYCAMEL_CONCURRENTQUEUE_INCLUDE_DIR
+    NAMES concurrentqueue.h
+    PATH_SUFFIXES concurrentqueue/moodycamel moodycamel concurrency
+    DOC "moodycamel ConcurrentQueue include directory"
+)
+
+if(NOT MOODYCAMEL_CONCURRENTQUEUE_INCLUDE_DIR)
+    message(
+        FATAL_ERROR
+        "moodycamel ConcurrentQueue header concurrentqueue.h not found. "
+        "Install it or set MOODYCAMEL_CONCURRENTQUEUE_INCLUDE_DIR."
+    )
+endif()
+
 add_subdirectory(galay-tracing)
 
 if(BUILD_TESTING)
